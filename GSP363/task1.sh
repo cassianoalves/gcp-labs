@@ -5,8 +5,8 @@ gcloud services enable translate.googleapis.com --project=$GOOGLE_CLOUD_PROJECT
 gcloud iam service-accounts create apigee-proxy \
     --display-name="apigee-proxy"
 
-gcloud projects add-iam-policy-binding ID_DO_SEU_PROJETO \
-    --member="serviceAccount:apigee-proxy@ID_DO_SEU_PROJETO.iam.gserviceaccount.com" \
+gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
+    --member="serviceAccount:apigee-proxy@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
     --role="roles/logging.logWriter"
 
 
@@ -15,6 +15,9 @@ gcloud projects add-iam-policy-binding ID_DO_SEU_PROJETO \
 PROJECT_ID=$GOOGLE_CLOUD_PROJECT
 ENVIRONMENT="eval"
 PROXY_NAME="translate-v1"
+SERVICE_ACCOUNT=apigee-proxy@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com
+PROJECT_NUMBER=$(gcloud projects describe $GOOGLE_CLOUD_PROJECT --format="value(projectNumber)")
+
 
 echo "=== 1. Criando estrutura de diretórios do proxy ==="
 mkdir -p ${PROXY_NAME}/apiproxy/proxies
@@ -106,9 +109,47 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?
 
 echo -e "\n\n=== 8. Fazendo o Deploy no ambiente: ${ENVIRONMENT} ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/1/deployments" \
+  -H "Content-Type: application/json" \
+  -d "{\"serviceAccount\": \"$SERVICE_ACCOUNT\"}" \
   -H "Authorization: Bearer ${TOKEN}"
 
 echo -e "\n\n=== Limpando arquivos temporários ==="
 rm -rf ${PROXY_NAME} ${PROXY_NAME}.zip
 
+
+export INSTANCE_NAME=eval-instance
+export ENV_NAME=eval
+export PREV_INSTANCE_STATE=
+echo "waiting for runtime instance ${INSTANCE_NAME} to be active"
+while :
+do
+  export INSTANCE_STATE=$(curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" -X GET "https://apigee.googleapis.com/v1/organizations/${GOOGLE_CLOUD_PROJECT}/instances/${INSTANCE_NAME}" | jq "select(.state != null) | .state" --raw-output)
+  [[ "${INSTANCE_STATE}" == "${PREV_INSTANCE_STATE}" ]] || (echo
+  echo "INSTANCE_STATE=${INSTANCE_STATE}")
+  export PREV_INSTANCE_STATE=${INSTANCE_STATE}
+  [[ "${INSTANCE_STATE}" != "ACTIVE" ]] || break
+  echo -n "."
+  sleep 5
+done
+echo
+echo "instance created, waiting for environment ${ENV_NAME} to be attached to instance"
+while :
+do
+  export ATTACHMENT_DONE=$(curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" -X GET "https://apigee.googleapis.com/v1/organizations/${GOOGLE_CLOUD_PROJECT}/instances/${INSTANCE_NAME}/attachments" | jq "select(.attachments != null) | .attachments[] | select(.environment == \"${ENV_NAME}\") | .environment" --join-output)
+  [[ "${ATTACHMENT_DONE}" != "${ENV_NAME}" ]] || break
+  echo -n "."
+  sleep 5
+done
+echo "***ORG IS READY TO USE***"
+
+
+echo "Concedendo a role 'iam.serviceAccountTokenCreator' para o Agente Apigee..."
+gcloud iam service-accounts add-iam-policy-binding $SERVICE_ACCOUNT \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --member="serviceAccount:service-$PROJECT_NUMBER@gcp-sa-apigee.iam.gserviceaccount.com"
+
 echo "Processo concluído!"
+
+
+curl -i -k -X POST "https://eval.example.com/translate/v1" -H "Content-Type: application/json" -d '{ "q": "Translate this text!", "target": "es" }'
+
