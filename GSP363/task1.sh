@@ -110,8 +110,10 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?
 echo -e "\n\n=== 8. Fazendo o Deploy no ambiente: ${ENVIRONMENT} ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/1/deployments" \
   -H "Content-Type: application/json" \
-  -d "{\"serviceAccount\": \"$SERVICE_ACCOUNT\"}" \
-  -H "Authorization: Bearer ${TOKEN}"
+  -H "Authorization: Bearer ${TOKEN}" \
+  -d '{
+   "serviceAccount": "'"${SERVICE_ACCOUNT}"'"
+  }'
 
 echo -e "\n\n=== Limpando arquivos temporários ==="
 rm -rf ${PROXY_NAME} ${PROXY_NAME}.zip

@@ -1,14 +1,5 @@
 #!/bin/bash
 
-#curl -i -k -X POST "https://eval.example.com/translate/v1" -H "Content-Type: application/json" -d '{ "q": "Translate this text!", "target": "es" }'
-#GET https://translation.googleapis.com/v3/projects/PROJECT_NUMBER_OR_ID/locations/global/supportedLanguages
-#curl -i "https://translation.googleapis.com/v3/projects/$GOOGLE_CLOUD_PROJECT/locations/global/supportedLanguages" -H "Authorization: Bearer ${TOKEN}"
-#
-## Tests
-#curl -i -k -X GET "https://eval.example.com/translate/v1/languages"
-#curl -i -k -X POST "https://eval.example.com/translate/v1?lang=de" -H "Content-Type:application/json" -d '{ "text": "Hello world!" }'
-#curl -i -k -X POST "https://eval.example.com/translate/v1" -H "Content-Type:application/json" -d '{ "text": "Hello world!" }'
-
 # Configurações - Substitua com os seus dados
 PROJECT_ID=$GOOGLE_CLOUD_PROJECT
 ENVIRONMENT="eval"
@@ -17,7 +8,7 @@ SERVICE_ACCOUNT=apigee-proxy@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com
 PROJECT_NUMBER=$(gcloud projects describe $GOOGLE_CLOUD_PROJECT --format="value(projectNumber)")
 
 
-echo "=== 1. Criando estrutura completa de diretórios do proxy ==="
+echo "=== 1. Reestruturando Diretórios ==="
 rm -rf ${PROXY_NAME} ${PROXY_NAME}.zip
 mkdir -p ${PROXY_NAME}/apiproxy/proxies
 mkdir -p ${PROXY_NAME}/apiproxy/targets
@@ -25,13 +16,20 @@ mkdir -p ${PROXY_NAME}/apiproxy/policies
 mkdir -p ${PROXY_NAME}/apiproxy/properties
 mkdir -p ${PROXY_NAME}/apiproxy/resources/jsc
 
-echo "=== 2. Criando o Property Set (language.properties.properties) ==="
+# Arquivos estáticos e Property Sets
 cat <<EOF > ${PROXY_NAME}/apiproxy/properties/language.properties.properties
 output=es
 caller=en
 EOF
 
-echo "=== 3. Criando a política AM-BuildTranslateRequest ==="
+cat <<EOF > ${PROXY_NAME}/apiproxy/resources/jsc/JS-BuildLanguagesResponse.js
+var payload = context.getVariable("response.content");
+var payloadObj = JSON.parse(payload);
+var newPayload = JSON.stringify(payloadObj.data.languages);
+context.setVariable("response.content", newPayload);
+EOF
+
+# Políticas existentes
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateRequest">
@@ -51,7 +49,6 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
 </AssignMessage>
 EOF
 
-echo "=== 4. Criando a política AM-BuildTranslateResponse ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateResponse">
@@ -67,7 +64,6 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateResponse.xml
 </AssignMessage>
 EOF
 
-echo "=== 5. Criando a política AM-BuildLanguagesRequest ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildLanguagesRequest.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildLanguagesRequest">
@@ -80,56 +76,65 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildLanguagesRequest.xml
 </AssignMessage>
 EOF
 
-echo "=== 6. Criando o código JavaScript e a política JS-BuildLanguagesResponse ==="
-cat <<EOF > ${PROXY_NAME}/apiproxy/resources/jsc/JS-BuildLanguagesResponse.js
-var payload = context.getVariable("response.content");
-var payloadObj = JSON.parse(payload);
-var newPayload = JSON.stringify(payloadObj.data.languages);
-context.setVariable("response.content", newPayload);
-EOF
-
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/JS-BuildLanguagesResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <JavaScript continueOnError="false" enabled="true" timeLimit="200" name="JS-BuildLanguagesResponse">
     <DisplayName>JS-BuildLanguagesResponse</DisplayName>
-    <Properties/>
     <ResourceURL>jsc://JS-BuildLanguagesResponse.js</ResourceURL>
 </JavaScript>
 EOF
 
-echo "=== 7. Criando o arquivo de configuração principal (${PROXY_NAME}.xml) ==="
-cat <<EOF > ${PROXY_NAME}/apiproxy/${PROXY_NAME}.xml
+cat <<EOF > ${PROXY_NAME}/apiproxy/policies/VA-VerifyKey.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy revision="1" name="${PROXY_NAME}">
-    <Basepaths>/translate/v1</Basepaths>
-    <ConfigurationVersion majorVersion="4" minorVersion="0"/>
-    <DisplayName>${PROXY_NAME}</DisplayName>
-    <Policies>
-        <Policy>AM-BuildTranslateRequest</Policy>
-        <Policy>AM-BuildTranslateResponse</Policy>
-        <Policy>AM-BuildLanguagesRequest</Policy>
-        <Policy>JS-BuildLanguagesResponse</Policy>
-    </Policies>
-    <ProxyEndpoints>
-        <ProxyEndpoint>default</ProxyEndpoint>
-    </ProxyEndpoints>
-    <Resources>
-        <Resource>jsc://JS-BuildLanguagesResponse.js</Resource>
-    </Resources>
-    <TargetEndpoints>
-        <TargetEndpoint>default</TargetEndpoint>
-    </TargetEndpoints>
-</APIProxy>
+<VerifyAPIKey continueOnError="false" enabled="true" name="VA-VerifyKey">
+    <DisplayName>VA-VerifyKey</DisplayName>
+    <APIKey ref="request.header.Key"/>
+</VerifyAPIKey>
 EOF
 
-echo "=== 8. Criando o ProxyEndpoint com os Conditional Flows (default.xml) ==="
+cat <<EOF > ${PROXY_NAME}/apiproxy/policies/Q-EnforceQuota.xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Quota continueOnError="false" enabled="true" name="Q-EnforceQuota" type="calendar">
+    <DisplayName>Q-EnforceQuota</DisplayName>
+    <Allow count="5"/>
+    <Interval>1</Interval>
+    <TimeUnit>hour</TimeUnit>
+    <StartTime>2026-01-01 00:00:00</StartTime>
+    <Distributed>true</Distributed>
+    <Synchronous>true</Synchronous>
+    <UseQuotaConfigInAPIProduct>
+        <DefaultConfig/>
+    </UseQuotaConfigInAPIProduct>
+</Quota>
+EOF
+
+echo "=== 2. Criando a Nova Política de Logs (ML-LogTranslation) ==="
+cat <<EOF > ${PROXY_NAME}/apiproxy/policies/ML-LogTranslation.xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<MessageLogging continueOnError="false" enabled="true" name="ML-LogTranslation">
+    <DisplayName>ML-LogTranslation</DisplayName>
+    <CloudLogging>
+        <LogName>projects/{organization.name}/logs/translate</LogName>
+        <Message contentType="text/plain">{language}|{text}|{translated}</Message>
+    </CloudLogging>
+</MessageLogging>
+EOF
+
+echo "=== 3. Atualizando o ProxyEndpoint com o passo de Log (default.xml) ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/proxies/default.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ProxyEndpoint name="default">
     <Description/>
     <FaultRules/>
     <PreFlow name="PreFlow">
-        <Request/>
+        <Request>
+            <Step>
+                <Name>VA-VerifyKey</Name>
+            </Step>
+            <Step>
+                <Name>Q-EnforceQuota</Name>
+            </Step>
+        </Request>
         <Response/>
     </PreFlow>
     <PostFlow name="PostFlow">
@@ -147,6 +152,9 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/proxies/default.xml
             <Response>
                 <Step>
                     <Name>AM-BuildTranslateResponse</Name>
+                </Step>
+                <Step>
+                    <Name>ML-LogTranslation</Name>
                 </Step>
             </Response>
             <Condition>(proxy.pathsuffix MatchesPath "/") and (request.verb = "POST")</Condition>
@@ -176,21 +184,10 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/proxies/default.xml
 </ProxyEndpoint>
 EOF
 
-echo "=== 9. Criando o TargetEndpoint (default.xml) ==="
+# Destino padrão permanece o mesmo
 cat <<EOF > ${PROXY_NAME}/apiproxy/targets/default.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
-    <Description/>
-    <FaultRules/>
-    <PreFlow name="PreFlow">
-        <Request/>
-        <Response/>
-    </PreFlow>
-    <PostFlow name="PostFlow">
-        <Request/>
-        <Response/>
-    </PostFlow>
-    <Flows/>
     <HTTPTargetConnection>
         <URL>https://translation.googleapis.com/language/translate/v2</URL>
         <Authentication>
@@ -204,38 +201,53 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/targets/default.xml
 </TargetEndpoint>
 EOF
 
-echo "=== 10. Compactando o pacote do proxy ==="
+# Configuração do Manifesto Principal atualizado (Revisão 3)
+cat <<EOF > ${PROXY_NAME}/apiproxy/${PROXY_NAME}.xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<APIProxy revision="3" name="${PROXY_NAME}">
+    <Basepaths>/translate/v1</Basepaths>
+    <ConfigurationVersion majorVersion="4" minorVersion="0"/>
+    <DisplayName>${PROXY_NAME}</DisplayName>
+    <Policies>
+        <Policy>AM-BuildTranslateRequest</Policy>
+        <Policy>AM-BuildTranslateResponse</Policy>
+        <Policy>AM-BuildLanguagesRequest</Policy>
+        <Policy>JS-BuildLanguagesResponse</Policy>
+        <Policy>VA-VerifyKey</Policy>
+        <Policy>Q-EnforceQuota</Policy>
+        <Policy>ML-LogTranslation</Policy>
+    </Policies>
+    <ProxyEndpoints>
+        <ProxyEndpoint>default</ProxyEndpoint>
+    </ProxyEndpoints>
+    <Resources>
+        <Resource>jsc://JS-BuildLanguagesResponse.js</Resource>
+    </Resources>
+    <TargetEndpoints>
+        <TargetEndpoint>default</TargetEndpoint>
+    </TargetEndpoints>
+</APIProxy>
+EOF
+
+echo "=== 4. Compactando e enviando a Revisão 3 ==="
 cd ${PROXY_NAME}
-zip -r ../${PROXY_NAME}.zip apiproxy
+zip -r ../${PROXY_NAME}.zip apiproxy > /dev/null
 cd ..
 
-echo "=== 11. Obtendo token de autenticação do Gcloud ==="
 TOKEN=$(gcloud auth print-access-token)
 
-echo "=== 12. Enviando o proxy atualizado para o Apigee (Import) ==="
+# Envia o pacote zipado como importação
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: multipart/form-data" \
   -F "file=@${PROXY_NAME}.zip"
 
-echo -e "\n\n=== 13. Fazendo o Deploy da nova revisão no ambiente: ${ENVIRONMENT} ==="
-# Nota: sobrescreve/atualiza se necessário enviando a revisão gerada (geralmente sequencial se já existir)
-curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/1/deployments?override=true" \
-  -H "Content-Type: application/json" \
+echo -e "\n\n=== 5. Deploy da Revisão 3 no ambiente '${ENVIRONMENT}' ==="
+curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/3/deployments?override=true" \
   -H "Authorization: Bearer ${TOKEN}" \
   -d '{
    "serviceAccount": "'"${SERVICE_ACCOUNT}"'"
   }'
 
-echo -e "\n\n=== Limpando arquivos temporários ==="
 rm -rf ${PROXY_NAME} ${PROXY_NAME}.zip
-
-echo "Script concluído com sucesso!"
-
-echo "Testes:"
-set -x
-curl -i -k -X GET "https://eval.example.com/translate/v1/languages"
-curl -i -k -X POST "https://eval.example.com/translate/v1?lang=de" -H "Content-Type:application/json" -d '{ "text": "Hello world!" }'
-curl -i -k -X POST "https://eval.example.com/translate/v1" -H "Content-Type:application/json" -d '{ "text": "Hello world!" }'
-set +x
-
+echo -e "\n\nProxy atualizado com auditoria de logs de tradução ativa na Revisão 3!"
