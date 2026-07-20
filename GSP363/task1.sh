@@ -105,7 +105,11 @@ echo "=== 7. Enviando o proxy para o Apigee (Import) ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: multipart/form-data" \
-  -F "file=@${PROXY_NAME}.zip"
+  -F "file=@${PROXY_NAME}.zip" \
+  -o update.json
+
+cat update.json
+REVISION=$(cat update.json | jq -r '.revision')
 
 echo -e "\n\n=== 8. Fazendo o Deploy no ambiente: ${ENVIRONMENT} ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/1/deployments" \

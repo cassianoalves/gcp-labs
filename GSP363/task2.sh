@@ -37,7 +37,7 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateRequest">
     <AssignVariable>
         <Name>text</Name>
-        <Template>{jsonPath("$.text",request.content)}</Template>
+        <Template>{jsonPath('$.text',request.content)}</Template>
     </AssignVariable>
     <AssignVariable>
         <Name>language</Name>
@@ -46,7 +46,7 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
     <Set>
         <Payload contentType="application/json">{"q": "{text}", "target": "{language}"}</Payload>
     </Set>
-    <AssignTo createNew="false" transport="http" type="request"/>
+    <AssignTo>request</AssignTo>
 </AssignMessage>
 EOF
 
@@ -169,10 +169,6 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/proxies/default.xml
         <BasePath>/translate/v1</BasePath>
         <Properties/>
     </HTTPProxyConnection>
-    <RouteRule name="languages">
-        <Condition>(proxy.pathsuffix MatchesPath "/languages")</Condition>
-        <TargetEndpoint>languages</TargetEndpoint>
-    </RouteRule>
     <RouteRule name="default">
         <TargetEndpoint>default</TargetEndpoint>
     </RouteRule>
