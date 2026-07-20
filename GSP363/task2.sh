@@ -25,8 +25,8 @@ mkdir -p ${PROXY_NAME}/apiproxy/policies
 mkdir -p ${PROXY_NAME}/apiproxy/properties
 mkdir -p ${PROXY_NAME}/apiproxy/resources/jsc
 
-echo "=== 2. Criando o Property Set (language.properties.properties) ==="
-cat <<EOF > ${PROXY_NAME}/apiproxy/properties/language.properties.properties
+echo "=== 2. Criando o Property Set (language.properties) ==="
+cat <<EOF > ${PROXY_NAME}/apiproxy/properties/language.properties
 output=es
 caller=en
 EOF
@@ -35,14 +35,13 @@ echo "=== 3. Criando a política AM-BuildTranslateRequest ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateRequest">
-    <DisplayName>AM-BuildTranslateRequest</DisplayName>
     <AssignVariable>
         <Name>text</Name>
-        <Template>{jsonPath($.text,request.content)}</Template>
+        <Template>{jsonPath('$.text',request.content)}</Template>
     </AssignVariable>
     <AssignVariable>
         <Name>language</Name>
-        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.properties.output)}</Template>
+        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.output)}</Template>
     </AssignVariable>
     <Set>
         <Payload contentType="application/json">{"q": "{text}", "target": "{language}"}</Payload>
@@ -55,10 +54,9 @@ echo "=== 4. Criando a política AM-BuildTranslateResponse ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateResponse">
-    <DisplayName>AM-BuildTranslateResponse</DisplayName>
     <AssignVariable>
         <Name>translated</Name>
-        <Template>{jsonPath($.data.translations[0].translatedText,response.content)}</Template>
+        <Template>{jsonPath('$.data.translations[0].translatedText',response.content)}</Template>
     </AssignVariable>
     <Set>
         <Payload contentType="application/json">{"translated": "{translated}"}</Payload>
@@ -71,10 +69,15 @@ echo "=== 5. Criando a política AM-BuildLanguagesRequest ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildLanguagesRequest.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildLanguagesRequest">
-    <DisplayName>AM-BuildLanguagesRequest</DisplayName>
+    <AssignVariable>
+        <Name>targetLanguage</Name>
+        <Set>
+            <Value ref="propertyset.language.caller"/>
+        </Set>
+    </AssignVariable>
     <Set>
         <Verb>POST</Verb>
-        <Payload contentType="application/json">{"target": "{propertyset.language.properties.caller}"}</Payload>
+        <Payload contentType="application/json">{"target": "{targetLanguage}"}</Payload>
     </Set>
     <AssignTo createNew="true" transport="http" type="request"/>
 </AssignMessage>
@@ -114,10 +117,12 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/${PROXY_NAME}.xml
         <ProxyEndpoint>default</ProxyEndpoint>
     </ProxyEndpoints>
     <Resources>
+        <Resource>properties://language.properties</Resource>
         <Resource>jsc://JS-BuildLanguagesResponse.js</Resource>
     </Resources>
     <TargetEndpoints>
         <TargetEndpoint>default</TargetEndpoint>
+        <TargetEndpoint>languages</TargetEndpoint>
     </TargetEndpoints>
 </APIProxy>
 EOF
@@ -170,6 +175,10 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/proxies/default.xml
         <BasePath>/translate/v1</BasePath>
         <Properties/>
     </HTTPProxyConnection>
+    <RouteRule name="languages">
+        <Condition>(proxy.pathsuffix MatchesPath "/languages")</Condition>
+        <TargetEndpoint>languages</TargetEndpoint>
+    </RouteRule>
     <RouteRule name="default">
         <TargetEndpoint>default</TargetEndpoint>
     </RouteRule>
@@ -193,6 +202,34 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/targets/default.xml
     <Flows/>
     <HTTPTargetConnection>
         <URL>https://translation.googleapis.com/language/translate/v2</URL>
+        <Authentication>
+            <GoogleAccessToken>
+                <Scopes>
+                    <Scope>https://www.googleapis.com/auth/cloud-translation</Scope>
+                </Scopes>
+            </GoogleAccessToken>
+        </Authentication>
+    </HTTPTargetConnection>
+</TargetEndpoint>
+EOF
+
+echo "=== 10. Criando o TargetEndpoint para Listagem de Línguas (languages.xml) ==="
+cat <<EOF > ${PROXY_NAME}/apiproxy/targets/languages.xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<TargetEndpoint name="languages">
+    <Description/>
+    <FaultRules/>
+    <PreFlow name="PreFlow">
+        <Request/>
+        <Response/>
+    </PreFlow>
+    <PostFlow name="PostFlow">
+        <Request/>
+        <Response/>
+    </PostFlow>
+    <Flows/>
+    <HTTPTargetConnection>
+        <URL>https://translation.googleapis.com/language/translate/v2/languages</URL>
         <Authentication>
             <GoogleAccessToken>
                 <Scopes>
@@ -239,3 +276,14 @@ curl -i -k -X POST "https://eval.example.com/translate/v1?lang=de" -H "Content-T
 curl -i -k -X POST "https://eval.example.com/translate/v1" -H "Content-Type:application/json" -d '{ "text": "Hello world!" }'
 set +x
 
+#exit 0
+#
+#
+#gcloud config set project qwiklabs-gcp-02-628c57b7e3cd
+#TEST_VM_ZONE=$(gcloud compute instances list --filter="name=('apigeex-test-vm')" --format "value(zone)")
+#gcloud compute ssh apigeex-test-vm --zone=${TEST_VM_ZONE} --force-key-file-overwrite
+#
+#
+#
+#Check complete. Points earned: 16. Message:
+#Please create the 'AM-BuildTranslateRequest' AssignMessage policy with the correct configuration and redeploy the API proxy.
