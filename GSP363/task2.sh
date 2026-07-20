@@ -69,15 +69,10 @@ echo "=== 5. Criando a política AM-BuildLanguagesRequest ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildLanguagesRequest.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildLanguagesRequest">
-    <AssignVariable>
-        <Name>targetLanguage</Name>
-        <Set>
-            <Value ref="propertyset.language.caller"/>
-        </Set>
-    </AssignVariable>
+    <DisplayName>AM-BuildLanguagesRequest</DisplayName>
     <Set>
         <Verb>POST</Verb>
-        <Payload contentType="application/json">{"target": "{targetLanguage}"}</Payload>
+        <Payload contentType="application/json">{"target": "{propertyset.language.caller}"}</Payload>
     </Set>
     <AssignTo createNew="true" transport="http" type="request"/>
 </AssignMessage>
