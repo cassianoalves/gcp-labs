@@ -256,6 +256,7 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?
   -F "file=@${PROXY_NAME}.zip" \
   -o update.json
 
+cat update.json
 REVISION=$(cat update.json | jq -r '.revision')
 
 echo -e "\n\n=== 13. Fazendo o Deploy da nova revisão no ambiente: ${ENVIRONMENT} ==="
