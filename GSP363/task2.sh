@@ -37,7 +37,7 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateRequest">
     <AssignVariable>
         <Name>text</Name>
-        <Template>{jsonPath('$.text',request.content)}</Template>
+        <Template>{jsonPath("$.text",request.content)}</Template>
     </AssignVariable>
     <AssignVariable>
         <Name>language</Name>
@@ -253,11 +253,14 @@ echo "=== 12. Enviando o proxy atualizado para o Apigee (Import) ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: multipart/form-data" \
-  -F "file=@${PROXY_NAME}.zip"
+  -F "file=@${PROXY_NAME}.zip" \
+  -o update.json
+
+REVISION=$(cat update.json | jq -r '.revision')
 
 echo -e "\n\n=== 13. Fazendo o Deploy da nova revisão no ambiente: ${ENVIRONMENT} ==="
 # Nota: sobrescreve/atualiza se necessário enviando a revisão gerada (geralmente sequencial se já existir)
-curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/2/deployments?override=true" \
+curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/${REVISION}/deployments?override=true" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${TOKEN}" \
   -d '{
