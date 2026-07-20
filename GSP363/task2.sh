@@ -22,11 +22,11 @@ rm -rf ${PROXY_NAME} ${PROXY_NAME}.zip
 mkdir -p ${PROXY_NAME}/apiproxy/proxies
 mkdir -p ${PROXY_NAME}/apiproxy/targets
 mkdir -p ${PROXY_NAME}/apiproxy/policies
-mkdir -p ${PROXY_NAME}/apiproxy/properties
+mkdir -p ${PROXY_NAME}/apiproxy/resources/properties
 mkdir -p ${PROXY_NAME}/apiproxy/resources/jsc
 
 echo "=== 2. Criando o Property Set (language.properties) ==="
-cat <<EOF > ${PROXY_NAME}/apiproxy/properties/language.properties
+cat <<EOF > ${PROXY_NAME}/apiproxy/resources/properties/language.properties
 output=es
 caller=en
 EOF
