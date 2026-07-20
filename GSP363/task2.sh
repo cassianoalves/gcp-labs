@@ -117,7 +117,6 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/${PROXY_NAME}.xml
     </Resources>
     <TargetEndpoints>
         <TargetEndpoint>default</TargetEndpoint>
-        <TargetEndpoint>languages</TargetEndpoint>
     </TargetEndpoints>
 </APIProxy>
 EOF
