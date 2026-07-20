@@ -257,7 +257,7 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?
 
 echo -e "\n\n=== 13. Fazendo o Deploy da nova revisão no ambiente: ${ENVIRONMENT} ==="
 # Nota: sobrescreve/atualiza se necessário enviando a revisão gerada (geralmente sequencial se já existir)
-curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/1/deployments?override=true" \
+curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/2/deployments?override=true" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${TOKEN}" \
   -d '{
