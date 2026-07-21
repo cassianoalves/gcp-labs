@@ -16,50 +16,41 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apipr
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
-        "name": "translate-product",
-        "displayName": "translate-product",
-        "approvalType": "auto",
-        "attributes": [
-          {
-            "name": "access",
-            "value": "public"
-          }
-        ],
-        "apiResources": [
-          "/"
-        ],
-        "environments": [
-          "'"${ENV}"'"
-        ],
-        "proxies": [
-          "translate-v1"
-        ],
-        "quota": "10",
-        "quotaInterval": "1",
-        "quotaTimeUnit": "minute",
-        "operationGroup": {
-          "operationConfigs": [
+          "name": "translate-product",
+          "displayName": "translate-product",
+          "approvalType": "auto",
+          "attributes": [
             {
-              "apiSource": "translate-v1",
-              "operations": [
-                {
-                  "resource": "/",
-                  "methods": [
-                    "GET",
-                    "POST"
-                  ]
-                }
-              ],
-              "quota": {
-                "limit": "100",
-                "interval": "1",
-                "timeUnit": "minute"
-              }
+              "name": "access",
+              "value": "public"
             }
           ],
-          "operationConfigType": "proxy"
-        }
-      }'
+          "apiResources": [
+            "/"
+          ],
+          "environments": [
+            "'"${ENV}"'"
+          ],
+          "proxies": [
+            "translate-v1"
+          ],
+          "quota": "10",
+          "quotaInterval": "1",
+          "quotaTimeUnit": "minute",
+          "operationGroup": {
+            "operationConfigs": [
+              {
+                "apiSource": "translate-v1",
+                "operations": [
+                  {
+                    "resource": "/",
+                    "methods": ["GET", "POST"]
+                  }
+                ]
+              }
+            ]
+          }
+        }'
 
 echo -e "\n\n=== 2. Criando o Developer (joe@example.com) ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/developers" \
