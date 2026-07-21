@@ -17,7 +17,7 @@ mkdir -p ${PROXY_NAME}/apiproxy/properties
 mkdir -p ${PROXY_NAME}/apiproxy/resources/jsc
 
 # Reaproveitando as configurações de arquivos estáticos anteriores
-cat <<EOF > ${PROXY_NAME}/apiproxy/properties/language.properties.properties
+cat <<EOF > ${PROXY_NAME}/apiproxy/resources/properties/language.properties
 output=es
 caller=en
 EOF
@@ -40,12 +40,13 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
     </AssignVariable>
     <AssignVariable>
         <Name>language</Name>
-        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.properties.output)}</Template>
+        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.output)}</Template>
     </AssignVariable>
-    <Set>
-        <Payload contentType="application/json">{"q": "{text}", "target": "{language}"}</Payload>
-    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
     <AssignTo createNew="false" transport="http" type="request"/>
+    <Set>
+        <Payload contentType="application/json">{"q":"{text}","target":"{language}"}</Payload>
+    </Set>
 </AssignMessage>
 EOF
 
@@ -57,10 +58,11 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateResponse.xml
         <Name>translated</Name>
         <Template>{jsonPath($.data.translations[0].translatedText,response.content)}</Template>
     </AssignVariable>
-    <Set>
-        <Payload contentType="application/json">{"translated": "{translated}"}</Payload>
-    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
     <AssignTo createNew="true" transport="http" type="response"/>
+    <Set>
+        <Payload contentType="application/json">{"translated":"{translated}"}</Payload>
+    </Set>
 </AssignMessage>
 EOF
 
@@ -70,7 +72,7 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildLanguagesRequest.xml
     <DisplayName>AM-BuildLanguagesRequest</DisplayName>
     <Set>
         <Verb>POST</Verb>
-        <Payload contentType="application/json">{"target": "{propertyset.language.properties.caller}"}</Payload>
+        <Payload contentType="application/json">{"target": "{propertyset.language.caller}"}</Payload>
     </Set>
     <AssignTo createNew="true" transport="http" type="request"/>
 </AssignMessage>
@@ -78,10 +80,11 @@ EOF
 
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/JS-BuildLanguagesResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<JavaScript continueOnError="false" enabled="true" timeLimit="200" name="JS-BuildLanguagesResponse">
+<Javascript continueOnError="false" enabled="true" timeLimit="200" name="JS-BuildLanguagesResponse">
     <DisplayName>JS-BuildLanguagesResponse</DisplayName>
+    <Properties/>
     <ResourceURL>jsc://JS-BuildLanguagesResponse.js</ResourceURL>
-</JavaScript>
+</Javascript>
 EOF
 
 echo "=== 2. Criando a Nova Política VA-VerifyKey ==="
@@ -175,6 +178,17 @@ EOF
 cat <<EOF > ${PROXY_NAME}/apiproxy/targets/default.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
+    <Description/>
+    <FaultRules/>
+    <PreFlow name="PreFlow">
+        <Request/>
+        <Response/>
+    </PreFlow>
+    <PostFlow name="PostFlow">
+        <Request/>
+        <Response/>
+    </PostFlow>
+    <Flows/>
     <HTTPTargetConnection>
         <URL>https://translation.googleapis.com/language/translate/v2</URL>
         <Authentication>

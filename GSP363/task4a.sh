@@ -78,10 +78,10 @@ EOF
 
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/JS-BuildLanguagesResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<JavaScript continueOnError="false" enabled="true" timeLimit="200" name="JS-BuildLanguagesResponse">
+<Javascript continueOnError="false" enabled="true" timeLimit="200" name="JS-BuildLanguagesResponse">
     <DisplayName>JS-BuildLanguagesResponse</DisplayName>
     <ResourceURL>jsc://JS-BuildLanguagesResponse.js</ResourceURL>
-</JavaScript>
+</Javascript>
 EOF
 
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/VA-VerifyKey.xml
