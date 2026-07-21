@@ -101,14 +101,15 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/Q-EnforceQuota.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Quota continueOnError="false" enabled="true" name="Q-EnforceQuota" type="calendar">
     <DisplayName>Q-EnforceQuota</DisplayName>
-    <Allow count="5"/>
-    <Interval>1</Interval>
-    <TimeUnit>hour</TimeUnit>
     <StartTime>2026-01-01 00:00:00</StartTime>
     <Distributed>true</Distributed>
     <Synchronous>true</Synchronous>
-    <UseQuotaConfigInAPIProduct>
-        <DefaultConfig/>
+    <UseQuotaConfigInAPIProduct stepName="VAK-VerifyKey">
+        <DefaultConfig>
+            <Allow countRef="verifyapikey.VAK-VerifyKey.apiproduct.developer.quota.limit">5</Allow>
+            <Interval ref="verifyapikey.VAK-VerifyKey.apiproduct.developer.quota.interval">1</Interval>
+            <TimeUnit ref="verifyapikey.VAK-VerifyKey.apiproduct.developer.quota.timeunit">hour</TimeUnit>
+        </DefaultConfig>
     </UseQuotaConfigInAPIProduct>
 </Quota>
 EOF
