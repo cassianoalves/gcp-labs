@@ -17,7 +17,7 @@ mkdir -p ${PROXY_NAME}/apiproxy/properties
 mkdir -p ${PROXY_NAME}/apiproxy/resources/jsc
 
 # Arquivos estáticos e Property Sets
-cat <<EOF > ${PROXY_NAME}/apiproxy/properties/language.properties.properties
+cat <<EOF > ${PROXY_NAME}/apiproxy/resources/properties/language.properties
 output=es
 caller=en
 EOF
@@ -40,12 +40,13 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
     </AssignVariable>
     <AssignVariable>
         <Name>language</Name>
-        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.properties.output)}</Template>
+        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.output)}</Template>
     </AssignVariable>
-    <Set>
-        <Payload contentType="application/json">{"q": "{text}", "target": "{language}"}</Payload>
-    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
     <AssignTo createNew="false" transport="http" type="request"/>
+    <Set>
+        <Payload contentType="application/json">{"q":"{text}","target":"{language}"}</Payload>
+    </Set>
 </AssignMessage>
 EOF
 
@@ -57,10 +58,11 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateResponse.xml
         <Name>translated</Name>
         <Template>{jsonPath($.data.translations[0].translatedText,response.content)}</Template>
     </AssignVariable>
-    <Set>
-        <Payload contentType="application/json">{"translated": "{translated}"}</Payload>
-    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
     <AssignTo createNew="true" transport="http" type="response"/>
+    <Set>
+        <Payload contentType="application/json">{"translated":"{translated}"}</Payload>
+    </Set>
 </AssignMessage>
 EOF
 
@@ -70,7 +72,7 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildLanguagesRequest.xml
     <DisplayName>AM-BuildLanguagesRequest</DisplayName>
     <Set>
         <Verb>POST</Verb>
-        <Payload contentType="application/json">{"target": "{propertyset.language.properties.caller}"}</Payload>
+        <Payload contentType="application/json">{"target": "{propertyset.language.caller}"}</Payload>
     </Set>
     <AssignTo createNew="true" transport="http" type="request"/>
 </AssignMessage>
@@ -80,10 +82,12 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/JS-BuildLanguagesResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Javascript continueOnError="false" enabled="true" timeLimit="200" name="JS-BuildLanguagesResponse">
     <DisplayName>JS-BuildLanguagesResponse</DisplayName>
+    <Properties/>
     <ResourceURL>jsc://JS-BuildLanguagesResponse.js</ResourceURL>
 </Javascript>
 EOF
 
+echo "=== 2. Criando a Nova Política VA-VerifyKey ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/VA-VerifyKey.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <VerifyAPIKey continueOnError="false" enabled="true" name="VA-VerifyKey">
@@ -92,19 +96,18 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/VA-VerifyKey.xml
 </VerifyAPIKey>
 EOF
 
+echo "=== 3. Criando a Nova Política Q-EnforceQuota ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/Q-EnforceQuota.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Quota continueOnError="false" enabled="true" name="Q-EnforceQuota" type="calendar">
-    <DisplayName>Q-EnforceQuota</DisplayName>
-    <Allow count="5"/>
-    <Interval>1</Interval>
-    <TimeUnit>hour</TimeUnit>
-    <StartTime>2026-01-01 00:00:00</StartTime>
-    <Distributed>true</Distributed>
-    <Synchronous>true</Synchronous>
-    <UseQuotaConfigInAPIProduct>
-        <DefaultConfig/>
-    </UseQuotaConfigInAPIProduct>
+<Quota name="Q-EnforceQuota" type="calendar">
+  <UseQuotaConfigInAPIProduct stepName="VA-VerifyKey">
+    <DefaultConfig>
+      <Allow>5</Allow>
+      <Interval>1</Interval>
+      <TimeUnit>hour</TimeUnit>
+    </DefaultConfig>
+  </UseQuotaConfigInAPIProduct>
+  <StartTime>2022-01-01 00:00:00</StartTime>
 </Quota>
 EOF
 
@@ -188,6 +191,17 @@ EOF
 cat <<EOF > ${PROXY_NAME}/apiproxy/targets/default.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <TargetEndpoint name="default">
+    <Description/>
+    <FaultRules/>
+    <PreFlow name="PreFlow">
+        <Request/>
+        <Response/>
+    </PreFlow>
+    <PostFlow name="PostFlow">
+        <Request/>
+        <Response/>
+    </PostFlow>
+    <Flows/>
     <HTTPTargetConnection>
         <URL>https://translation.googleapis.com/language/translate/v2</URL>
         <Authentication>
@@ -204,7 +218,7 @@ EOF
 # Configuração do Manifesto Principal atualizado (Revisão 3)
 cat <<EOF > ${PROXY_NAME}/apiproxy/${PROXY_NAME}.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy revision="3" name="${PROXY_NAME}">
+<APIProxy name="${PROXY_NAME}">
     <Basepaths>/translate/v1</Basepaths>
     <ConfigurationVersion majorVersion="4" minorVersion="0"/>
     <DisplayName>${PROXY_NAME}</DisplayName>
@@ -240,10 +254,15 @@ TOKEN=$(gcloud auth print-access-token)
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: multipart/form-data" \
-  -F "file=@${PROXY_NAME}.zip"
+  -F "file=@${PROXY_NAME}.zip" \
+  -o update.json
+
+cat update.json
+REVISION=$(cat update.json | jq -r '.revision')
+
 
 echo -e "\n\n=== 5. Deploy da Revisão 3 no ambiente '${ENVIRONMENT}' ==="
-curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/3/deployments?override=true" \
+curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/${REVISION}/deployments?override=true" \
   -H "Authorization: Bearer ${TOKEN}" \
   -d '{
    "serviceAccount": "'"${SERVICE_ACCOUNT}"'"
