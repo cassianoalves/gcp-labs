@@ -262,6 +262,7 @@ REVISION=$(cat update.json | jq -r '.revision')
 
 echo -e "\n\n=== 5. Deploy da Revisão 3 no ambiente '${ENVIRONMENT}' ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/${REVISION}/deployments?override=true" \
+  -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${TOKEN}" \
   -d '{
    "serviceAccount": "'"${SERVICE_ACCOUNT}"'"
