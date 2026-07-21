@@ -16,28 +16,50 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apipr
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "translate-product",
-    "displayName": "translate-product",
-    "approvalType": "auto",
-    "attributes": [],
-    "environments": ["'"${ENV}"'"],
-    "quota": "10",
-    "quotaInterval": "1",
-    "quotaTimeUnit": "minute",
-    "operationGroup": {
-      "operationConfigs": [
-        {
-          "apiSource": "translate-v1",
-          "operations": [
+        "name": "translate-product",
+        "displayName": "translate-product",
+        "approvalType": "auto",
+        "attributes": [
+          {
+            "name": "access",
+            "value": "public"
+          }
+        ],
+        "apiResources": [
+          "/"
+        ],
+        "environments": [
+          "'"${ENV}"'"
+        ],
+        "proxies": [
+          "translate-v1"
+        ],
+        "quota": "10",
+        "quotaInterval": "1",
+        "quotaTimeUnit": "minute",
+        "operationGroup": {
+          "operationConfigs": [
             {
-              "resource": "/",
-              "methods": ["GET", "POST"]
+              "apiSource": "translate-v1",
+              "operations": [
+                {
+                  "resource": "/",
+                  "methods": [
+                    "GET",
+                    "POST"
+                  ]
+                }
+              ],
+              "quota": {
+                "limit": "100",
+                "interval": "1",
+                "timeUnit": "minute"
+              }
             }
-          ]
+          ],
+          "operationConfigType": "proxy"
         }
-      ]
-    }
-  }'
+      }'
 
 echo -e "\n\n=== 2. Criando o Developer (joe@example.com) ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/developers" \
@@ -55,9 +77,15 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/devel
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "translate-app",
-    "apiProducts": ["translate-product"]
-  }'
+        "name": "translate-app",
+        "displayName": "translate-app",
+        "developerEmail": "joe@example.com",
+        "callbackUrl": "",
+        "apiProducts": [
+          "translate-product"
+        ],
+        "expiryType": "never"
+      }'
 
 echo -e "\n\n=== 4. Extraindo a Chave de API (Consumer Key) para testes ==="
 API_KEY=$(curl -s -X GET "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/developers/joe@example.com/apps/translate-app" \
@@ -68,3 +96,4 @@ echo "CONFIGURAÇÃO CONCLUÍDA!"
 echo "Use esta chave para a variável \$KEY nos seus testes:"
 echo "KEY=$API_KEY"
 echo "--------------------------------------------------"
+export API_KEY
