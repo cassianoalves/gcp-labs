@@ -35,18 +35,20 @@ echo "=== 3. Criando a política AM-BuildTranslateRequest ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateRequest">
+    <DisplayName>AM-BuildTranslateRequest</DisplayName>
     <AssignVariable>
         <Name>text</Name>
-        <Template>{jsonPath('$.text',request.content)}</Template>
+        <Template>{jsonPath($.text,request.content)}</Template>
     </AssignVariable>
     <AssignVariable>
         <Name>language</Name>
         <Template>{firstnonnull(request.queryparam.lang,propertyset.language.output)}</Template>
     </AssignVariable>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+    <AssignTo createNew="false" transport="http" type="request"/>
     <Set>
-        <Payload contentType="application/json">{"q": "{text}", "target": "{language}"}</Payload>
+        <Payload contentType="application/json">{"q":"{text}","target":"{language}"}</Payload>
     </Set>
-    <AssignTo>request</AssignTo>
 </AssignMessage>
 EOF
 
@@ -192,34 +194,6 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/targets/default.xml
     <Flows/>
     <HTTPTargetConnection>
         <URL>https://translation.googleapis.com/language/translate/v2</URL>
-        <Authentication>
-            <GoogleAccessToken>
-                <Scopes>
-                    <Scope>https://www.googleapis.com/auth/cloud-translation</Scope>
-                </Scopes>
-            </GoogleAccessToken>
-        </Authentication>
-    </HTTPTargetConnection>
-</TargetEndpoint>
-EOF
-
-echo "=== 10. Criando o TargetEndpoint para Listagem de Línguas (languages.xml) ==="
-cat <<EOF > ${PROXY_NAME}/apiproxy/targets/languages.xml
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<TargetEndpoint name="languages">
-    <Description/>
-    <FaultRules/>
-    <PreFlow name="PreFlow">
-        <Request/>
-        <Response/>
-    </PreFlow>
-    <PostFlow name="PostFlow">
-        <Request/>
-        <Response/>
-    </PostFlow>
-    <Flows/>
-    <HTTPTargetConnection>
-        <URL>https://translation.googleapis.com/language/translate/v2/languages</URL>
         <Authentication>
             <GoogleAccessToken>
                 <Scopes>
