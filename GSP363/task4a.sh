@@ -114,8 +114,7 @@ EOF
 echo "=== 2. Criando a Nova Política de Logs (ML-LogTranslation) ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/ML-LogTranslation.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<MessageLogging continueOnError="false" enabled="true" name="ML-LogTranslation">
-    <DisplayName>ML-LogTranslation</DisplayName>
+<MessageLogging name="ML-LogTranslation">
     <CloudLogging>
         <LogName>projects/{organization.name}/logs/translate</LogName>
         <Message contentType="text/plain">{language}|{text}|{translated}</Message>
