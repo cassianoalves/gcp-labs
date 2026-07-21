@@ -202,7 +202,7 @@ EOF
 
 cat <<EOF > ${PROXY_NAME}/apiproxy/${PROXY_NAME}.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy revision="2" name="${PROXY_NAME}">
+<APIProxy name="${PROXY_NAME}">
     <Basepaths>/translate/v1</Basepaths>
     <ConfigurationVersion majorVersion="4" minorVersion="0"/>
     <DisplayName>${PROXY_NAME}</DisplayName>

@@ -23,7 +23,7 @@ mkdir -p sharedflowbundle/policies
 # 2. Criando o Manifesto Principal EXATAMENTE igual ao export do Console
 cat <<EOF > sharedflowbundle/$SF_NAME.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<SharedFlowBundle revision="1" name="$SF_NAME">
+<SharedFlowBundle name="$SF_NAME">
    <DisplayName/>
    <Description/>
    <SharedFlows>

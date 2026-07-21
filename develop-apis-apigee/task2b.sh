@@ -92,7 +92,7 @@ EOF
 # =====================================================================
 cat <<EOF > apiproxy/$PROXY_NAME.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy revision="1" name="$PROXY_NAME">
+<APIProxy name="$PROXY_NAME">
     <Basepaths>$BASE_PATH</Basepaths>
     <ConfigurationVersion>4.0</ConfigurationVersion>
     <Description/>
