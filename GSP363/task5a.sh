@@ -7,13 +7,6 @@ PROXY_NAME="translate-v1"
 SERVICE_ACCOUNT=apigee-proxy@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com
 PROJECT_NUMBER=$(gcloud projects describe $GOOGLE_CLOUD_PROJECT --format="value(projectNumber)")
 
-#!/bin/bash
-
-# Configurações - Altere ou exporte antes de rodar
-PROJECT_ID="ID_DO_SEU_PROJETO"
-ENVIRONMENT="eval"
-PROXY_NAME="translate-v1"
-SERVICE_ACCOUNT="apigee-proxy@${PROJECT_ID}.iam.gserviceaccount.com" # Exemplo baseado na SA criada na Etapa 1
 
 echo "=== 1. Reestruturando Diretórios ==="
 rm -rf ${PROXY_NAME} ${PROXY_NAME}.zip
@@ -23,8 +16,8 @@ mkdir -p ${PROXY_NAME}/apiproxy/policies
 mkdir -p ${PROXY_NAME}/apiproxy/properties
 mkdir -p ${PROXY_NAME}/apiproxy/resources/jsc
 
-# Arquivos de propriedades e JavaScript (Cenários Anteriores)
-cat <<EOF > ${PROXY_NAME}/apiproxy/properties/language.properties.properties
+# Arquivos estáticos e Property Sets
+cat <<EOF > ${PROXY_NAME}/apiproxy/resources/properties/language.properties
 output=es
 caller=en
 EOF
@@ -47,12 +40,13 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateRequest.xml
     </AssignVariable>
     <AssignVariable>
         <Name>language</Name>
-        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.properties.output)}</Template>
+        <Template>{firstnonnull(request.queryparam.lang,propertyset.language.output)}</Template>
     </AssignVariable>
-    <Set>
-        <Payload contentType="application/json">{"q": "{text}", "target": "{language}"}</Payload>
-    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
     <AssignTo createNew="false" transport="http" type="request"/>
+    <Set>
+        <Payload contentType="application/json">{"q":"{text}","target":"{language}"}</Payload>
+    </Set>
 </AssignMessage>
 EOF
 
@@ -64,10 +58,11 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateResponse.xml
         <Name>translated</Name>
         <Template>{jsonPath($.data.translations[0].translatedText,response.content)}</Template>
     </AssignVariable>
-    <Set>
-        <Payload contentType="application/json">{"translated": "{translated}"}</Payload>
-    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
     <AssignTo createNew="true" transport="http" type="response"/>
+    <Set>
+        <Payload contentType="application/json">{"translated":"{translated}"}</Payload>
+    </Set>
 </AssignMessage>
 EOF
 
@@ -77,7 +72,7 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildLanguagesRequest.xml
     <DisplayName>AM-BuildLanguagesRequest</DisplayName>
     <Set>
         <Verb>POST</Verb>
-        <Payload contentType="application/json">{"target": "{propertyset.language.properties.caller}"}</Payload>
+        <Payload contentType="application/json">{"target": "{propertyset.language.caller}"}</Payload>
     </Set>
     <AssignTo createNew="true" transport="http" type="request"/>
 </AssignMessage>
@@ -87,10 +82,12 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/JS-BuildLanguagesResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Javascript continueOnError="false" enabled="true" timeLimit="200" name="JS-BuildLanguagesResponse">
     <DisplayName>JS-BuildLanguagesResponse</DisplayName>
+    <Properties/>
     <ResourceURL>jsc://JS-BuildLanguagesResponse.js</ResourceURL>
 </Javascript>
 EOF
 
+echo "=== 2. Criando a Nova Política VA-VerifyKey ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/VA-VerifyKey.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <VerifyAPIKey continueOnError="false" enabled="true" name="VA-VerifyKey">
@@ -99,27 +96,25 @@ cat <<EOF > ${PROXY_NAME}/apiproxy/policies/VA-VerifyKey.xml
 </VerifyAPIKey>
 EOF
 
+echo "=== 3. Criando a Nova Política Q-EnforceQuota ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/Q-EnforceQuota.xml
-xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Quota continueOnError="false" enabled="true" name="Q-EnforceQuota" type="calendar">
-    <DisplayName>Q-EnforceQuota</DisplayName>
-    <Allow count="5"/>
-    <Interval>1</Interval>
-    <TimeUnit>hour</TimeUnit>
-    <StartTime>2026-01-01 00:00:00</StartTime>
-    <Distributed>true</Distributed>
-    <Synchronous>true</Synchronous>
-    <UseQuotaConfigInAPIProduct>
-        <DefaultConfig/>
-    </UseQuotaConfigInAPIProduct>
+<Quota name="Q-EnforceQuota" type="calendar">
+  <UseQuotaConfigInAPIProduct stepName="VA-VerifyKey">
+    <DefaultConfig>
+      <Allow>5</Allow>
+      <Interval>1</Interval>
+      <TimeUnit>hour</TimeUnit>
+    </DefaultConfig>
+  </UseQuotaConfigInAPIProduct>
+  <StartTime>2022-01-01 00:00:00</StartTime>
 </Quota>
 EOF
 
+echo "=== 2. Criando a Nova Política de Logs (ML-LogTranslation) ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/ML-LogTranslation.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<MessageLogging continueOnError="false" enabled="true" name="ML-LogTranslation">
-    <DisplayName>ML-LogTranslation</DisplayName>
+<MessageLogging name="ML-LogTranslation">
     <CloudLogging>
         <LogName>projects/{organization.name}/logs/translate</LogName>
         <Message contentType="text/plain">{language}|{text}|{translated}</Message>
@@ -276,15 +271,19 @@ echo "=== 7. Enviando a Revisão 4 para o Apigee (Import) ==="
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: multipart/form-data" \
-  -F "file=@${PROXY_NAME}.zip"
+  -F "file=@${PROXY_NAME}.zip" \
+  -o update.json
 
-echo -e "\n\n=== 8. Deploy da Revisão 4 com vinculação da Service Account ==="
-# O payload JSON especifica explicitamente a Service Account a ser amarrada à implantação do proxy
-curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/4/deployments?override=true" \
-  -H "Authorization: Bearer ${TOKEN}" \
+cat update.json
+REVISION=$(cat update.json | jq -r '.revision')
+
+
+echo -e "\n\n=== 5. Deploy da Revisão 3 no ambiente '${ENVIRONMENT}' ==="
+curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/${REVISION}/deployments?override=true" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -d '{
-    "serviceAccount": "'"${SERVICE_ACCOUNT}"'"
+   "serviceAccount": "'"${SERVICE_ACCOUNT}"'"
   }'
 
 rm -rf ${PROXY_NAME} ${PROXY_NAME}.zip
