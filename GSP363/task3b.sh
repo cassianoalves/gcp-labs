@@ -225,10 +225,14 @@ TOKEN=$(gcloud auth print-access-token)
 curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/apis?name=${PROXY_NAME}&action=import" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: multipart/form-data" \
-  -F "file=@${PROXY_NAME}.zip"
+  -F "file=@${PROXY_NAME}.zip" \
+  -o update.json
+
+cat update.json
+REVISION=$(cat update.json | jq -r '.revision')
 
 echo -e "\n\n=== 6. Deploy da Revisão 2 no ambiente '${ENVIRONMENT}' ==="
-curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/2/deployments?override=true" \
+curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/environments/${ENVIRONMENT}/apis/${PROXY_NAME}/revisions/$REVISION/deployments?override=true" \
   -H "Authorization: Bearer ${TOKEN}" \
   -d '{
    "serviceAccount": "'"${SERVICE_ACCOUNT}"'"
