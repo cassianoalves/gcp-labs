@@ -56,14 +56,16 @@ echo "=== 4. Criando a política AM-BuildTranslateResponse ==="
 cat <<EOF > ${PROXY_NAME}/apiproxy/policies/AM-BuildTranslateResponse.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <AssignMessage continueOnError="false" enabled="true" name="AM-BuildTranslateResponse">
+    <DisplayName>AM-BuildTranslateResponse</DisplayName>
     <AssignVariable>
         <Name>translated</Name>
-        <Template>{jsonPath('$.data.translations[0].translatedText',response.content)}</Template>
+        <Template>{jsonPath($.data.translations[0].translatedText,response.content)}</Template>
     </AssignVariable>
-    <Set>
-        <Payload contentType="application/json">{"translated": "{translated}"}</Payload>
-    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
     <AssignTo createNew="true" transport="http" type="response"/>
+    <Set>
+        <Payload contentType="application/json">{"translated":"{translated}"}</Payload>
+    </Set>
 </AssignMessage>
 EOF
 
