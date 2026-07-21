@@ -55,15 +55,9 @@ curl -X POST "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/devel
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
-        "name": "translate-app",
-        "displayName": "translate-app",
-        "developerEmail": "joe@example.com",
-        "callbackUrl": "",
-        "apiProducts": [
-          "translate-product"
-        ],
-        "expiryType": "never"
-      }'
+    "name": "translate-app",
+    "apiProducts": ["translate-product"]
+  }'
 
 echo -e "\n\n=== 4. Extraindo a Chave de API (Consumer Key) para testes ==="
 API_KEY=$(curl -s -X GET "https://apigee.googleapis.com/v1/organizations/${PROJECT_ID}/developers/joe@example.com/apps/translate-app" \
